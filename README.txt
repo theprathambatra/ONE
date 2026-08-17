@@ -1,4 +1,4 @@
-ONE — mobile/tablet-optimized single-screen build
-Files: index.html + one-logo.png
-No dependencies, build step, API, or database required.
-Deploy both files together on GitHub Pages, Vercel, Netlify, or any static host.
+ONE | mobile and tablet optimized single-screen build
+Core files: index.html, styles.css, app.js, matrix.js, skills-1.js, skills-2.js, skills-3.js, one-logo.png
+No API or database required.
+Static deployment works on GitHub Pages, Vercel, Netlify, or any comparable static host.

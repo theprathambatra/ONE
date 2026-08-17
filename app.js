@@ -1,55 +1,99 @@
 (() => {
   "use strict";
 
-  const cores=window.ONE_SKILLS; const {audiences,outcomes,formats,edges}=window.ONE_MATRIX;
+  const cores=window.ONE_SKILLS;
+  const {audiences,outcomes,formats,edges}=window.ONE_MATRIX;
 
-  const TOTAL = cores.length * audiences.length * outcomes.length * formats.length * edges.length; // 187,500
+  const TOTAL = cores.length * audiences.length * outcomes.length * formats.length * edges.length;
   if (TOTAL !== 187500) throw new Error("ONE pool must equal exactly 187,500");
+
+  const modeWords = [
+    ["Signal Plan","Performance System","Test Sprint","Growth Lab","Validation Track","Optimization Plan","Pilot System","Decision Sprint"],
+    ["Momentum Stack","Growth Workflow","Execution Engine","Automation Loop","Operator System","Fast Track","Action Pipeline","Delivery Stack"],
+    ["Diagnostic Pack","Scorecard","Benchmark Sprint","Audit Kit","Experiment Pack","Launch Playbook","Action Blueprint","Performance Kit"],
+    ["Starter Kit","Growth Kit","Workflow Pack","Launch Kit","Operator Pack","Momentum Kit","Action System","Execution Pack"]
+  ];
+
+  function titleFor(core,audience,outcome,formatIndex,edgeIndex,seed){
+    const mode = formatIndex * 2 + edgeIndex;
+    const words = modeWords[mode];
+    const variant = words[seed % words.length];
+
+    if(mode===0) return `${core.name}: ${outcome.label} ${variant} for ${audience}`;
+    if(mode===1) return `${core.name} ${variant} for ${audience}: ${outcome.label}`;
+    if(mode===2) return `${audience} ${variant}: ${core.name} for ${outcome.label}`;
+    return `${outcome.label} ${variant} for ${audience} with ${core.name}`;
+  }
 
   function ideaFromIndex(index){
     let n = ((index % TOTAL) + TOTAL) % TOTAL;
-    const edge = edges[n % edges.length]; n = Math.floor(n / edges.length);
-    const format = formats[n % formats.length]; n = Math.floor(n / formats.length);
-    const outcome = outcomes[n % outcomes.length]; n = Math.floor(n / outcomes.length);
-    const audience = audiences[n % audiences.length]; n = Math.floor(n / audiences.length);
-    const core = cores[n % cores.length];
+
+    const edgeIndex = n % edges.length;
+    const edge = edges[edgeIndex];
+    n = Math.floor(n / edges.length);
+
+    const formatIndex = n % formats.length;
+    const format = formats[formatIndex];
+    n = Math.floor(n / formats.length);
+
+    const outcomeIndex = n % outcomes.length;
+    const outcome = outcomes[outcomeIndex];
+    n = Math.floor(n / outcomes.length);
+
+    const audienceIndex = n % audiences.length;
+    const audience = audiences[audienceIndex];
+    n = Math.floor(n / audiences.length);
+
+    const coreIndex = n % cores.length;
+    const core = cores[coreIndex];
 
     const audienceLower = audience.toLowerCase();
+    const seed = coreIndex * 17 + audienceIndex * 11 + outcomeIndex * 5;
+
     return {
       index,
-      title: `${edge.label} ${format.label} ${core.name} for ${audience} — ${outcome.label}`,
-      description: `Offer ${format.desc} for ${audienceLower}, using ${core.name} to ${outcome.phrase}. Start with ${core.build}; judge the first test by ${outcome.metric}. The ${edge.label.toLowerCase()} edge means you ${edge.desc}.`,
-      learn: `${core.skill}; ${edge.learn}`,
-      build: `${core.build}; package it as ${format.build}`,
-      impact: `${core.why}. Proof signal: ${outcome.metric}.`
+      title: titleFor(core,audience,outcome,formatIndex,edgeIndex,seed),
+      description: `For ${audienceLower}, use ${core.name} to ${outcome.phrase}. Shape it as ${format.desc}. Start with ${core.build}. Measure ${outcome.metric}. ${edge.desc}.`,
+      learn: `${core.skill}; ${format.learn}; ${edge.learn}`,
+      build: `${core.build}; then turn it into ${format.build}`,
+      impact: `${core.why}. Track ${outcome.metric}.`
     };
   }
 
-  // A browser-local 187,500-card deck. The affine permutation visits every index
-  // exactly once before repeating, while requiring only three small stored numbers.
   const STORE_KEY = "one-deck-v4-187500";
   function gcd(a,b){ while(b){ [a,b] = [b,a%b]; } return a; }
   function secureInt(max){
     if(window.crypto && crypto.getRandomValues){
-      const a = new Uint32Array(1); crypto.getRandomValues(a); return a[0] % max;
+      const a = new Uint32Array(1);
+      crypto.getRandomValues(a);
+      return a[0] % max;
     }
     return Math.floor(Math.random()*max);
   }
+
   function freshDeck(){
     let a;
     do{ a = 1 + secureInt(TOTAL-1); }while(gcd(a,TOTAL)!==1);
     return {a, b:secureInt(TOTAL), k:0, cycle:1};
   }
+
   function loadDeck(){
     try{
       const parsed = JSON.parse(localStorage.getItem(STORE_KEY) || "null");
       if(parsed && Number.isInteger(parsed.a) && Number.isInteger(parsed.b) && Number.isInteger(parsed.k) &&
          gcd(parsed.a,TOTAL)===1 && parsed.b>=0 && parsed.b<TOTAL && parsed.k>=0 && parsed.k<=TOTAL) return parsed;
     }catch(_){}
-    const d=freshDeck(); saveDeck(d); return d;
+    const d=freshDeck();
+    saveDeck(d);
+    return d;
   }
-  function saveDeck(d){ try{ localStorage.setItem(STORE_KEY,JSON.stringify(d)); }catch(_){} }
+
+  function saveDeck(d){
+    try{ localStorage.setItem(STORE_KEY,JSON.stringify(d)); }catch(_){}
+  }
+
   let deck = loadDeck();
+
   function nextUniqueIndex(){
     if(deck.k >= TOTAL){
       const oldCycle = deck.cycle || 1;
@@ -151,15 +195,13 @@
         scanLabel.textContent=[
           "Opening the field",
           "Eliminating noise",
-          "Compressing 187,500 routes",
+          "Compressing 100K+ routes",
           "Locking one direction"
         ][stage];
         lastStage=stage;
       }
 
       if(now-lastGhost > (t<.55?62:t<.82?82:125)){
-        // Samples are drawn from the same 187.5K generator; the winner itself remains
-        // governed by the no-repeat deck.
         addGhost(secureInt(TOTAL));
         lastGhost=now;
       }
@@ -183,7 +225,6 @@
   });
   updateDeckStatus();
 
-  // Reactive field: desktop follows the pointer; touch devices create local energy bursts.
   window.addEventListener("pointermove",e=>{
     document.documentElement.style.setProperty("--mx",`${e.clientX}px`);
     document.documentElement.style.setProperty("--my",`${e.clientY}px`);
@@ -194,66 +235,99 @@
       document.documentElement.style.setProperty("--mx",`${e.clientX}px`);
       document.documentElement.style.setProperty("--my",`${e.clientY}px`);
       const b=document.createElement("div");
-      b.className="touch-burst"; b.style.left=e.clientX+"px"; b.style.top=e.clientY+"px";
-      document.body.appendChild(b); setTimeout(()=>b.remove(),760);
+      b.className="touch-burst";
+      b.style.left=e.clientX+"px";
+      b.style.top=e.clientY+"px";
+      document.body.appendChild(b);
+      setTimeout(()=>b.remove(),760);
     },{passive:true});
   }
 
-  // Particle field
   const canvas=document.getElementById("field");
   const ctx=canvas.getContext("2d");
   let W=0,H=0,dpr=1,particles=[];
   const pointer={x:innerWidth/2,y:innerHeight/2,active:false};
 
   function resize(){
-    W=innerWidth;H=innerHeight;dpr=Math.min(devicePixelRatio||1,2);
-    canvas.width=Math.floor(W*dpr);canvas.height=Math.floor(H*dpr);
-    canvas.style.width=W+"px";canvas.style.height=H+"px";
+    W=innerWidth;
+    H=innerHeight;
+    dpr=Math.min(devicePixelRatio||1,2);
+    canvas.width=Math.floor(W*dpr);
+    canvas.height=Math.floor(H*dpr);
+    canvas.style.width=W+"px";
+    canvas.style.height=H+"px";
     ctx.setTransform(dpr,0,0,dpr,0,0);
     const count=Math.max(34,Math.min(82,Math.floor((W*H)/19000)));
     particles=Array.from({length:count},()=>({
-      x:Math.random()*W,y:Math.random()*H,
-      vx:(Math.random()-.5)*.13,vy:(Math.random()-.5)*.13,
-      r:.35+Math.random()*1.05,p:Math.random()*Math.PI*2
+      x:Math.random()*W,
+      y:Math.random()*H,
+      vx:(Math.random()-.5)*.13,
+      vy:(Math.random()-.5)*.13,
+      r:.35+Math.random()*1.05,
+      p:Math.random()*Math.PI*2
     }));
   }
+
   resize();
   addEventListener("resize",resize,{passive:true});
   if(window.visualViewport) visualViewport.addEventListener("resize",resize,{passive:true});
 
-  addEventListener("pointermove",e=>{pointer.x=e.clientX;pointer.y=e.clientY;pointer.active=true},{passive:true});
+  addEventListener("pointermove",e=>{
+    pointer.x=e.clientX;
+    pointer.y=e.clientY;
+    pointer.active=true;
+  },{passive:true});
   addEventListener("pointerleave",()=>pointer.active=false,{passive:true});
 
   function draw(){
     ctx.clearRect(0,0,W,H);
     const searching=document.body.dataset.state==="searching";
     const speed=searching?2.8:1;
+
     for(const p of particles){
-      p.x+=p.vx*speed;p.y+=p.vy*speed;p.p+=.015;
-      if(p.x<-10)p.x=W+10;if(p.x>W+10)p.x=-10;if(p.y<-10)p.y=H+10;if(p.y>H+10)p.y=-10;
+      p.x+=p.vx*speed;
+      p.y+=p.vy*speed;
+      p.p+=.015;
+      if(p.x<-10)p.x=W+10;
+      if(p.x>W+10)p.x=-10;
+      if(p.y<-10)p.y=H+10;
+      if(p.y>H+10)p.y=-10;
+
       if(pointer.active){
         const dx=pointer.x-p.x,dy=pointer.y-p.y,d2=dx*dx+dy*dy;
-        if(d2<26000 && d2>1){const force=(1-d2/26000)*.0012;p.vx+=dx*force;p.vy+=dy*force}
+        if(d2<26000 && d2>1){
+          const force=(1-d2/26000)*.0012;
+          p.vx+=dx*force;
+          p.vy+=dy*force;
+        }
       }
-      p.vx*=.995;p.vy*=.995;
-      ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
-      ctx.fillStyle=`rgba(255,255,255,${.16 + .08*Math.sin(p.p)})`;ctx.fill();
+
+      p.vx*=.995;
+      p.vy*=.995;
+      ctx.beginPath();
+      ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+      ctx.fillStyle=`rgba(255,255,255,${.16 + .08*Math.sin(p.p)})`;
+      ctx.fill();
     }
+
     for(let i=0;i<particles.length;i++){
       for(let j=i+1;j<particles.length;j++){
         const a=particles[i],b=particles[j],dx=a.x-b.x,dy=a.y-b.y,d=Math.hypot(dx,dy);
         if(d<120){
-          ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);
-          ctx.strokeStyle=`rgba(255,255,255,${(1-d/120)*.055})`;ctx.lineWidth=.7;ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(a.x,a.y);
+          ctx.lineTo(b.x,b.y);
+          ctx.strokeStyle=`rgba(255,255,255,${(1-d/120)*.055})`;
+          ctx.lineWidth=.7;
+          ctx.stroke();
         }
       }
     }
     requestAnimationFrame(draw);
   }
+
   draw();
 
-  // Small integrity test in production: titles from all dimensions must stay unique.
-  // We do not allocate all 187.5K strings at runtime; this checks a representative set.
   const sanity = new Set();
   for(let i=0;i<2500;i+=17) sanity.add(ideaFromIndex(i).title);
   if(sanity.size < 140) console.warn("ONE uniqueness sanity check failed");
